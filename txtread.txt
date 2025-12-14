@@ -1,0 +1,233 @@
+admin user token
+{
+  "message": "User registered successfully.",
+  "user": {
+    "id": 2,
+    "name": "Admin User",
+    "email": "admin@example.com",
+    "role": "admin",
+    "created_at": "2025-12-05T01:58:19.169Z"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Miwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzY0ODk5OTA0LCJleHAiOjE3NjU1MDQ3MDR9.NZv1CF3XwNABceJySJVOZXuLGBWtZcuotxCvnlvw9rg"
+}
+
+
+\Users\lenovo\Documents\webtech-dlc>node hashPassword.js
+New password: DlcAdmin123!
+Hashed password: $2b$10$ut5VzC9hYCc1eJGnoxQstOXny5fBAMMw5DeYXa7kRqZVAw9JK2IRm
+
+$2b$10$ut5VzC9hYCc1eJGnoxQstOXny5fBAMMw5DeYXa7kRqZVAw9JK2IRm
+
+
+
+// This function:
+// 1. Checks if an admin user already exists
+// 2. If not, creates a default admin: ybh@example.com / ybh123!
+const seedAdmin = async () => {
+  try {
+    // 1. Check if any admin exists
+    const result = await pool.query(
+      "SELECT id FROM users WHERE role = 'admin' LIMIT 1"
+    );
+
+    if (result.rows.length > 0) {
+      console.log('✔ Admin already exists, skipping admin seed.');
+      return;
+    }
+
+    // 2. No admin found → create one
+    const email = 'ybh@example.com';
+    const plainPassword = 'ybh123!';
+    const name = 'Adminbh User';
+
+
+
+    # Digital Library Catalogue System (DLC)
+
+A web-based library catalogue for Academic City University College that allows students to search and browse books, and librarians/admins to manage the collection. The system supports secure authentication, role-based access, book CRUD operations, and basic borrowing with due dates.
+
+---
+
+## 1. Features
+
+### Public / Student
+- User registration and login (JWT-based auth)
+- View all books in a clean grid layout
+- Search by title/author
+- Filter by:
+  - Category
+  - Status (Available / Borrowed)
+- See book details:
+  - Title, Author, Category, ISBN, Description
+  - Status badge (Available / Borrowed)
+  - **Due date** when the book is currently borrowed
+- Borrow available books (when logged in)
+
+### Admin
+- Admin login
+- View all books in a table with:
+  - ID, Title, Author, Category, Status, Due Date
+- Add new books
+- Edit existing books (title, author, category, ISBN, description, status)
+- Delete books
+- Mark books as returned (updates status back to `available`)
+
+### Borrowing Logic
+- When a user borrows a book:
+  - A record is saved in `borrow_records`
+  - A default due date is set to **7 days** from the borrow date
+  - Book status becomes `borrowed`
+- When a book is returned:
+  - The active borrow record is marked with `returned_at`
+  - Book status becomes `available` again
+- Only:
+  - The admin, or
+  - The same user who borrowed the book  
+  can mark it as returned.
+
+---
+
+## 2. Tech Stack
+
+- **Backend**: Node.js, Express
+- **Database**: PostgreSQL
+- **Frontend**: HTML, CSS, Vanilla JavaScript (SPA-style behaviour)
+- **Auth**: JWT (JSON Web Token) + bcrypt password hashing
+- **Deployment Target**: Render (web service) + GitHub
+
+---
+
+## 3. Project Structure
+
+```text
+webtech-dlc/
+├─ config/
+│  └─ db.js              # PostgreSQL connection
+├─ middleware/
+│  └─ auth.js            # JWT verify + admin check
+├─ routes/
+│  ├─ authRoutes.js      # /api/auth/register, /api/auth/login
+│  └─ bookRoutes.js      # /api/books, borrow/return logic
+├─ public/
+│  ├─ index.html         # Single-page frontend
+│  ├─ style.css          # Styling
+│  └─ app.js             # Frontend logic (SPA)
+├─ server.js             # Express app entry point
+├─ package.json
+└─ .env                  # Environment variables (NOT committed)
+
+4. Database Schema
+Table: users
+id (PK, serial)
+name (text)
+email (text, unique)
+password_hash (text)
+role (text: 'student' or 'admin')
+created_at (timestamp, default now)
+
+Table: books
+id (PK, serial)
+title (text)
+author (text)
+isbn (text, nullable)
+category (text, nullable)
+description (text, nullable)
+status (text: 'available' or 'borrowed')
+created_at (timestamp, default now)
+
+Table: borrow_records
+id (PK, serial)
+user_id (FK → users.id)
+book_id (FK → books.id)
+borrowed_at (timestamp)
+due_date (timestamp)
+returned_at (timestamp, nullable)
+Only rows with returned_at IS NULL are considered active borrows.
+
+5. Setup Instructions
+Prerequisites
+Node.js installed
+PostgreSQL database (local or hosted e.g. Render)
+Clone the Repo
+git clone <your-repo-url>
+cd webtech-dlc
+npm install
+
+Set Up Environment Variables
+Create a .env file in the root with:
+PORT=5000
+DATABASE_URL=postgres://<user>:<password>@<host>:<port>/<db_name>
+JWT_SECRET=your_super_secret_key
+note: env is in .gitignore for security so it won't be committed
+
+start the Server in Development
+npm run dev
+backend server will run on http://localhost:5000
+frontend can be accessed at http://localhost:5000/
+
+api overviews
+Auth
+
+POST /api/auth/register
+Body: { "name", "email", "password" }
+Creates a new user (student by default) and returns a JWT.
+POST /api/auth/login
+Body: { "email", "password" }
+Returns user + token if credentials are correct.
+
+Books
+
+GET /api/books
+Public.
+Query:
+search (optional)
+category (optional)
+status (available or borrowed)
+Returns list of books with current_due_date when borrowed.
+GET /api/books/:id
+Public.
+Returns single book with current_due_date if borrowed.
+POST /api/books (admin only)
+Create a new book.
+PUT /api/books/:id (admin only)
+Update book details.
+DELETE /api/books/:id (admin only)
+Remove a book.
+
+Borrow / Return
+
+POST /api/books/:id/borrow (logged-in student)
+If book is available:
+Creates borrow_records row with 7-day due_date
+Sets book status → borrowed
+POST /api/books/:id/return (borrower or admin)
+Marks returned_at on the active record
+Sets book status → available
+
+frontend
+The frontend is a simple SPA using vanilla JS. It interacts with the backend API to provide the described functionality.
+Single index.html with sections:
+Login view
+Register view
+Books view (student)
+Admin dashboard view
+Navigation is handled by JavaScript:
+Show/hide views based on currentUser and role
+Uses fetch to call the API:
+Attaches Authorization: Bearer <token> header when logged in
+LocalStorage:
+Stores token and user object
+Restores session on page refresh
+
+Deployment
+push the code to GitHub
+Create a Web Service on Render:
+Language: Node
+Build command: npm install
+Start command: node server.js
+Set environment variables on Render:
+DATABASE_URL
+JWT_SECRET
+PORT (if necessary)
+Update API_BASE_URL in public/app.js for production:
+redeploy and test the live app.
